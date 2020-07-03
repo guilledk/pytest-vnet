@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+
+import sys
+import docker
+import pathlib
+
+from docker.types import Mount
+
+client = docker.from_env()
+
+cont = client.containers.run(
+	"pytest-vnet:netvm",
+	detach=True,
+	mounts=[
+		Mount(
+			"/mnt/vol",
+			str(pathlib.Path().absolute()),
+			"bind"
+			)
+		]
+	)
+
+
+python_version = f"{sys.version_info[0]}."\
+	f"{sys.version_info[1]}."\
+	f"{sys.version_info[2]}"
+
+_, out = cont.exec_run(["pyenv", "update"])
+
+print(out)
+
+print(cont.logs())
