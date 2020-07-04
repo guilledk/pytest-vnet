@@ -1,32 +1,68 @@
 #!/usr/bin/env python3
 
 import sys
+import time
 import docker
 import pathlib
 
 from docker.types import Mount
 
+def waitfor(cntr, attr_path, expect=None, timeout=20):
+    """Wait for a container's attr value to be set.
+    If ``expect`` is provided wait for the value to be set to that value.
+    """
+    def get(val, path):
+        for key in path:
+            val = val[key]
+        return val
+
+    start = time.time()
+    while time.time() - start < timeout:
+        cntr.reload()
+        val = get(cntr.attrs, attr_path)
+        if expect is None and val:
+            return val
+        elif val == expect:
+            return val
+    else:
+        raise TimeoutError("{} failed to be {}".format(
+            attr_path, expect if expect else 'not None'))
+
+
 client = docker.from_env()
 
-cont = client.containers.run(
+cont = client.containers.create(
 	"pytest-vnet:netvm",
-	detach=True,
 	mounts=[
 		Mount(
-			"/mnt/vol",
+			"/root",
 			str(pathlib.Path().absolute()),
+			"bind"
+			),
+		Mount(
+			"/root/.pyenv",
+			str(pathlib.Path.home() / ".pyenv"),
 			"bind"
 			)
 		]
 	)
 
+cont.start()
 
-python_version = f"{sys.version_info[0]}."\
-	f"{sys.version_info[1]}."\
-	f"{sys.version_info[2]}"
+waitfor(cont, ('NetworkSettings', 'IPAddress'))
+#waitfor(cont, ('State', 'Health', 'Status'), expect='healthy')
 
-_, out = cont.exec_run(["pyenv", "update"])
+out = cont.attach(stream=True)
 
-print(out)
+_, pwdout = cont.exec_run(
+	"pwd",
+	workdir="/root"
+	)
 
-print(cont.logs())
+for chunk in out:
+	print(chunk.decode("utf-8"), end="", flush=True)
+
+print(f"pwd: {pwdout}")
+
+cont.stop()
+cont.remove()
