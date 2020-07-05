@@ -7,38 +7,12 @@ import pathlib
 
 from docker.types import Mount
 
-def waitfor(cntr, attr_path, expect=None, timeout=20):
-    """Wait for a container's attr value to be set.
-    If ``expect`` is provided wait for the value to be set to that value.
-    """
-    def get(val, path):
-        for key in path:
-            val = val[key]
-        return val
-
-    start = time.time()
-    while time.time() - start < timeout:
-        cntr.reload()
-        val = get(cntr.attrs, attr_path)
-        if expect is None and val:
-            return val
-        elif val == expect:
-            return val
-    else:
-        raise TimeoutError("{} failed to be {}".format(
-            attr_path, expect if expect else 'not None'))
-
-
 client = docker.from_env()
 
 cont = client.containers.create(
 	"pytest-vnet:netvm",
+	privileged=True,
 	mounts=[
-		Mount(
-			"/root",
-			str(pathlib.Path().absolute()),
-			"bind"
-			),
 		Mount(
 			"/root/.pyenv",
 			str(pathlib.Path.home() / ".pyenv"),
@@ -49,20 +23,12 @@ cont = client.containers.create(
 
 cont.start()
 
-waitfor(cont, ('NetworkSettings', 'IPAddress'))
-#waitfor(cont, ('State', 'Health', 'Status'), expect='healthy')
-
-out = cont.attach(stream=True)
-
-_, pwdout = cont.exec_run(
-	"pwd",
+_, out = cont.exec_run(
+	["python3", "-c", "import mininet\nimport sys\nprint(sys.version_info)"],
 	workdir="/root"
 	)
 
-for chunk in out:
-	print(chunk.decode("utf-8"), end="", flush=True)
-
-print(f"pwd: {pwdout}")
+print(out.decode("utf-8"), end="", flush=True)
 
 cont.stop()
 cont.remove()

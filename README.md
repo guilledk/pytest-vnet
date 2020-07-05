@@ -2,9 +2,7 @@ The idea is beign able to run  `pytest-vnet mytest.py` and have this wrapper loa
 
 mininet image:
 
-https://hub.docker.com/r/hanszimmer5000/mininet
-
-docker run --privileged hanszimmer5000/mininet:v2.2-latest mn --test pingall
+see netvm folder
 
 get installed python packages & locations
 

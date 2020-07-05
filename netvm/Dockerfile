@@ -1,14 +1,30 @@
-FROM hanszimmer5000/mininet
+FROM ubuntu:18.04
 
-RUN apt-get install -y build-essential libssl-dev zlib1g-dev libbz2-dev \
-libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev libncursesw5-dev \
-xz-utils tk-dev libffi-dev liblzma-dev python-openssl git
+USER root
+WORKDIR /root
 
-RUN curl https://pyenv.run | bash
+COPY ENTRYPOINT.sh /
+RUN chmod +x /ENTRYPOINT.sh
 
-ENV PATH="/root/.pyenv/bin:$PATH"
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends \
+	git \
+    curl \
+	python3 \
+	python3-pip \
+	python3-setuptools
 
-RUN echo 'eval "$(pyenv init -)"' >> /root/.bashrc
-RUN echo 'eval "$(pyenv virtualenv-init -)"' >> /root/.bashrc
+RUN apt-get install -y --no-install-recommends \
+    mininet \
+    tcpdump \
+    iproute2 \
+    net-tools \
+    iputils-ping \
+    openvswitch-switch \
+    openvswitch-testcontroller
 
-RUN tail /root/.bashrc
+RUN pip3 install git+git://github.com/mininet/mininet.git
+
+EXPOSE 6633 6653 6640
+
+ENTRYPOINT ["/ENTRYPOINT.sh"]
