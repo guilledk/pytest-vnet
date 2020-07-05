@@ -16,7 +16,8 @@ cont = client.containers.create(
 		Mount(
 			"/root/.pyenv",
 			str(pathlib.Path.home() / ".pyenv"),
-			"bind"
+			"bind",
+			read_only=True
 			)
 		]
 	)
@@ -24,7 +25,7 @@ cont = client.containers.create(
 cont.start()
 
 _, out = cont.exec_run(
-	["python3", "-c", "import mininet\nimport sys\nprint(sys.version_info)"],
+	["pyenv", "versions"],
 	workdir="/root"
 	)
 
