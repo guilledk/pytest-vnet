@@ -7,15 +7,26 @@ import pathlib
 
 from docker.types import Mount
 
+
+python_version = f"{sys.version_info[0]}."\
+	f"{sys.version_info[1]}."\
+	f"{sys.version_info[2]}"
+
 client = docker.from_env()
 
 cont = client.containers.create(
 	"pytest-vnet:netvm",
 	privileged=True,
 	mounts=[
+		# Mount(
+		# 	f"/root/.pyenv/versions/{python_version}/lib/python{sys.version_info[0]}.{sys.version_info[1]}/site-packages",
+		# 	str(pathlib.Path.home() / f".pyenv/versions/{python_version}/lib/python{sys.version_info[0]}.{sys.version_info[1]}/site-packages"),
+		# 	"bind",
+		# 	read_only=True
+		# 	),
 		Mount(
-			"/root/.pyenv",
-			str(pathlib.Path.home() / ".pyenv"),
+			"/root/working_area",
+			str(pathlib.Path().absolute()),
 			"bind",
 			read_only=True
 			)
@@ -25,11 +36,13 @@ cont = client.containers.create(
 cont.start()
 
 _, out = cont.exec_run(
-	["pyenv", "versions"],
-	workdir="/root"
+	["mn", "--test", "pingall"],
+	workdir="/root/working_area",
+	stream=True
 	)
 
-print(out.decode("utf-8"), end="", flush=True)
+for chunk in out:
+	print(chunk.decode("utf-8"), end="", flush=True)
 
 cont.stop()
 cont.remove()
