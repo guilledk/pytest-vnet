@@ -1,27 +1,15 @@
-The idea is being able to run  `pytest-vnet mytest.py` and have this wrapper load the test to a docker container with mininet, run pytest on it and return its output.
+# `pytest-vnet`
 
-CURRENT PROGRESS:
+`pytest-vnet` is a `pytest` plugin for running software defined network tests inside a docker container with `mininet`, the plugin will manage the python envoirment inside the container to match the hosts python version or a custom one, load tests into the container, run them and return results.
 
-clone this repo:
+## Install this package:
 
-	git clone git://github.com/guilledk/pytest-vnet.git
+	pip install git+git://github.com/guilledk/pytest-vnet.git
 
-build image:
+## Build base netvm image (will be automatic in the future):
 
 	docker build --tag pytest-vnet:netvm netvm/
 
-install required python on container:
+## Run your test:
 
-	python install_python.py
-
-run mininet scripts inside container:
-
-	python run_in_container.py $TARGET
-
-example:
-
-	python run_in_container.py test_net.py
-
-to run interactive shell:
-
-	docker run --it --privileged pytest-vnet:netvm
+	pytest-vnet test_net.py
