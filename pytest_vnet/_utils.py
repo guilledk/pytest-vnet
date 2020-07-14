@@ -27,7 +27,7 @@ def stream_run(cont, *args, **kwargs):
 def background_run(cont, *args, **kwargs) -> int:
 	"""Run and if a non zero exit code is returned raise exception
 	"""
-	print(" ".join(args[0]), end="...", flush=True)
+	print(" ".join(args[0]), end=" ... ", flush=True)
 	ec, _ = cont.exec_run(
 		*args, **kwargs
 	)
@@ -36,4 +36,4 @@ def background_run(cont, *args, **kwargs) -> int:
 		raise NonZeroExitcode(
 			f"Command \"{args[0]}\" returned non zero exitcode {ec}."
 		)
-	print("done!")
+	print("done")

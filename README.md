@@ -6,10 +6,17 @@
 
 	pip install git+git://github.com/guilledk/pytest-vnet.git
 
-## Build base netvm image (will be automatic in the future):
+## Mark your mininet tests with:
 
-	docker build --tag pytest-vnet:netvm netvm/
+```python
+from pytest_vnet import run_in_netvm
+
+@run_in_netvm
+def test_net():
+	from mininet.cli import CLI
+	...
+```
 
 ## Run your test:
 
-	pytest-vnet test_net.py
+	pytest
