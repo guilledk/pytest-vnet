@@ -3,10 +3,12 @@
 import os
 import re
 import sys
+import pytest
 import docker
 import pathlib
 
 from docker.types import Mount
+from docker.models.containers import Container
 
 from typing import Optional
 
@@ -17,28 +19,29 @@ from tempfile import TemporaryFile, TemporaryDirectory
 from ._utils import NonZeroExitcode, stream_run, background_run
 
 
+DOCKERC =  docker.from_env()
+
 PYTHON_VERSION = f"{sys.version_info[0]}."\
     f"{sys.version_info[1]}."\
     f"{sys.version_info[2]}"
 
 
-def prepare_container(target_version: Optional[str] = None):
+run_in_netvm = pytest.mark.RUN_IN_NETVM
 
+
+def install_python_container(target_version: Optional[str] = None) -> None:
     if target_version is None:
         target_version = PYTHON_VERSION
 
-    client = docker.from_env()
-
-    print("instantiating container", end="...", flush=True)
-    cont = client.containers.create(
-        "pytest-vnet:netvm",
+    print("instantiating container", end=" ... ", flush=True)
+    cont = DOCKERC.containers.create(
+        "guilledk/pytest-vnet:netvm",
         tty=True
     )
 
     cont.start()
-    print("done!")
+    print("done")
 
-    print(f"installing python {target_version}:")
     try:
         """Get a copy of the source of the currently running python version
         and untar it.
@@ -74,23 +77,22 @@ def prepare_container(target_version: Optional[str] = None):
     except NonZeroExitcode as ex:
         cont.stop()
         cont.remove()
-        print(ex)
+        raise
 
     else:
         # Save the image
         cont.commit(f"pytest-vnet:netvm-{target_version}")
 
-    if cont.status == "running":
-        cont.stop()
-
-    client.close()
+    cont.stop()
 
     print(f"container pytest-vnet:netvm-{target_version} ready.")
 
 
-def run_in_netvm(run_target: Path):
+def initiate_container(target_version: Optional[str] = None) -> Container:
+    DOCKERC = docker.from_env()
 
-    client = docker.from_env()
+    if target_version is None:
+        target_version = PYTHON_VERSION
 
     # Read current sys.path, and create bind mounts to container /root/lib
     dynmounts = []
@@ -116,43 +118,39 @@ def run_in_netvm(run_target: Path):
                     )
                 )
 
-    with TemporaryDirectory() as tmpdirname:
-        with open(f"{tmpdirname}/{run_target.name}", "w") as tmp_run:
-            with open(run_target, "r") as src:
-                # Patch up target file, insert sys.path appends on top
-                tmp_run.write("import sys\n")
-                for path in sys_path_targets:
-                    tmp_run.write(f"sys.path.append(\"{path}\")\n")
+    # with TemporaryDirectory() as tmpdirname:
+    #     with open(f"{tmpdirname}/{run_target.name}", "w") as tmp_run:
+    #         with open(run_target, "r") as src:
+    #             # Patch up target file, insert sys.path appends on top
+    #             tmp_run.write("import sys\n")
+    #             for path in sys_path_targets:
+    #                 tmp_run.write(f"sys.path.append(\"{path}\")\n")
 
-                # Write rest of the file
-                tmp_run.write(src.read())
+    #             # Write rest of the file
+    #             tmp_run.write(src.read())
 
-        # Instance container
-        cont = client.containers.create(
-            f"pytest-vnet:netvm-{PYTHON_VERSION}",
-            privileged=True,
-            tty=True,
-            mounts=dynmounts +
-                [
-                    Mount(
-                        "/root/test",
-                        tmpdirname,
-                        "bind"
-                    )
-                ]
-            )
+    # Instance container
+    cont = DOCKERC.containers.create(
+        f"pytest-vnet:netvm-{PYTHON_VERSION}",
+        privileged=True,
+        tty=True,
+        mounts=dynmounts
+    )
 
-        cont.start()
+    cont.start()
 
-        # Restart openvswitch just in case
-        cont.exec_run("service openvswitch-switch start")
+    # Restart openvswitch just in case
+    cont.exec_run("service openvswitch-switch start")
 
-        # Run target
-        stream_run(
-            cont,
-            ["python3", run_target.name],
-            workdir="/root/test"
-        )
+    return cont
 
-        cont.stop()
-        cont.remove()
+
+        # # Run target
+        # stream_run(
+        #     cont,
+        #     ["python3", run_target.name],
+        #     workdir="/root/test"
+        # )
+
+        # cont.stop()
+        # cont.remove()

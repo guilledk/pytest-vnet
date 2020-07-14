@@ -1,17 +1,21 @@
 
-from mininet.cli import CLI
-from mininet.log import lg, info
-from mininet.net import Mininet
-from mininet.node import OVSKernelSwitch
-from mininet.topolib import TreeTopo
+from pytest_vnet import run_in_netvm
 
-def ifconfigTest( net ):
-    "Run ifconfig on all hosts in net."
-    hosts = net.hosts
-    for host in hosts:
-        info( host.cmd( 'ifconfig' ) )
+@run_in_netvm
+def test_ifconfig():
 
-if __name__ == '__main__':
+    from mininet.cli import CLI
+    from mininet.log import lg, info
+    from mininet.net import Mininet
+    from mininet.node import OVSKernelSwitch
+    from mininet.topolib import TreeTopo
+
+    def ifconfigTest( net ):
+        "Run ifconfig on all hosts in net."
+        hosts = net.hosts
+        for host in hosts:
+            info( host.cmd( 'ifconfig' ) )
+
     lg.setLogLevel( 'info' )
     info( "*** Initializing Mininet and kernel modules\n" )
     OVSKernelSwitch.setup()
