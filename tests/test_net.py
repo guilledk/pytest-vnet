@@ -1,4 +1,3 @@
-
 from pytest_vnet import run_in_netvm
 
 @run_in_netvm

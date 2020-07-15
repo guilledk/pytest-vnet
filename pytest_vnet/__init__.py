@@ -14,8 +14,6 @@ from typing import Optional
 
 from pathlib import Path
 
-from tempfile import TemporaryFile, TemporaryDirectory
-
 from ._utils import NonZeroExitcode, stream_run, background_run
 
 
@@ -26,7 +24,7 @@ PYTHON_VERSION = f"{sys.version_info[0]}."\
     f"{sys.version_info[2]}"
 
 
-run_in_netvm = pytest.mark.RUN_IN_NETVM
+run_in_netvm = pytest.mark.run_in_netvm
 
 
 def install_python_container(target_version: Optional[str] = None) -> None:
@@ -117,17 +115,6 @@ def initiate_container(target_version: Optional[str] = None) -> Container:
                         read_only=True
                     )
                 )
-
-    # with TemporaryDirectory() as tmpdirname:
-    #     with open(f"{tmpdirname}/{run_target.name}", "w") as tmp_run:
-    #         with open(run_target, "r") as src:
-    #             # Patch up target file, insert sys.path appends on top
-    #             tmp_run.write("import sys\n")
-    #             for path in sys_path_targets:
-    #                 tmp_run.write(f"sys.path.append(\"{path}\")\n")
-
-    #             # Write rest of the file
-    #             tmp_run.write(src.read())
 
     # Instance container
     cont = DOCKERC.containers.create(
