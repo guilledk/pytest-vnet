@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
 import docker
+import inspect
 import pytest_vnet
 
 from typing import Optional
 
+from tempfile import TemporaryFile, TemporaryDirectory
+
 from pytest import Item
 from _pytest.runner import CallInfo
+from _pytest.python import Function
 
 from pytest_vnet import DOCKERC
 
@@ -15,7 +19,29 @@ from docker.models.containers import Container
 
 TEST_VM: Optional[Container] = None
 
+
+def pytest_addoption(parser):
+    parser.addini(
+        "netvm_required",
+        "enable pytest-vnet",
+        type="bool",
+        default=False,
+    )
+
+
+def pytest_configure(config):
+    # So that it shows up in 'pytest --markers' output:
+    config.addinivalue_line(
+        "markers", "run_in_netvm: "
+        "mark the test as a self contained mininet test; "
+        "it will be run inside a netvm container"
+    )
+
+
 def pytest_sessionstart(session):
+
+	if not session.config.getini("netvm_required"):
+		return
 
 	global TEST_VM
 
@@ -54,9 +80,31 @@ def pytest_sessionfinish(session, exitstatus):
 
 
 def pytest_runtest_protocol(item: Item, nextitem: Optional[Item]) -> bool:
-	if "RUN_IN_NETVM" in [mark.name for mark in item.iter_markers()]:
+	if item.get_closest_marker("run_in_netvm") is not None and \
+		isinstance(item, Function):
+
 		ihook = item.ihook
 		ihook.pytest_runtest_logstart(nodeid=item.nodeid, location=item.location)
+
+		# with TemporaryDirectory() as tmpdirname:
+		#     with open(f"{tmpdirname}/{item.name}.py", "w") as tmp_run:
+		#         with open(run_target, "r") as src:
+		#             # Patch up target file, insert sys.path appends on top
+		#             tmp_run.write("import sys\n")
+		#             for path in sys_path_targets:
+		#                 tmp_run.write(f"sys.path.append(\"{path}\")\n")
+
+		#             # Write rest of the file
+		#             tmp_run.write(src.read())
+
+		with open("test.py", "w") as tmp_test:
+
+			func_source = inspect.getsource(item.function)
+
+			first_newline = func_source.find('\n', 0)
+
+			tmp_test.write(func_source[first_newline+1:])
+
 		call = CallInfo(None, 0, 0, 0, "call")
 		report = ihook.pytest_runtest_makereport(item=item, call=call)
 		ihook.pytest_runtest_logreport(report=report)
