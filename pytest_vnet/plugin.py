@@ -135,6 +135,7 @@ class VirtualNetworkPlugin:
         # Check if base image is present or pull it
         try:
             netvm_base_image = self.docker_client.images.get("guilledk/pytest-vnet:netvm")
+            print()
 
         except docker.errors.ImageNotFound:
             print("\nbase netvm image not found, pulling 238.3mb", end=" ... ", flush=True)
@@ -152,6 +153,7 @@ class VirtualNetworkPlugin:
                 mounts=self.dynmounts
             )
             self.container.start()
+            print("done")
 
         except docker.errors.ImageNotFound:
             print(
@@ -164,6 +166,7 @@ class VirtualNetworkPlugin:
         self.exec_in_vm(["service", "openvswitch-switch", "restart"])
 
     def shutdown(self):
-        if self.container is not None:
-            self.container.stop()
-            self.container.remove()
+        print("\n\nstopping netvm", end=" ... ", flush=True)
+        self.container.stop()
+        self.container.remove()
+        print("done")
