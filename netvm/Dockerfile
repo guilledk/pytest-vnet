@@ -50,7 +50,7 @@ RUN rm /usr/bin/lsb_release
 # Prepare Start
 EXPOSE 6633 6653 6640
 
-COPY entrypoint.sh /home/entrypoint.sh
-RUN chmod +x /home/entrypoint.sh
+# COPY entrypoint.sh /home/entrypoint.sh
+# RUN chmod +x /home/entrypoint.sh
 
-ENTRYPOINT [ "/home/entrypoint.sh" ]
+# ENTRYPOINT [ "/home/entrypoint.sh" ]
