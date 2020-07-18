@@ -5,8 +5,11 @@ import sys
 import pytest
 import docker
 import pathlib
+import inspect
 
-from typing import Optional
+from typing import Optional, Tuple, Union
+
+from tempfile import TemporaryDirectory
 
 from docker.types import Mount
 from docker.models.containers import Container
@@ -24,12 +27,72 @@ class NonZeroExitcode(Exception):
     ...
 
 
+class VNetItem:
+
+    def __init__(self, plugin, item):
+        self.plugin = plugin
+        self.item = item
+        self.dir = TemporaryDirectory()
+
+    def prepare_run(self):
+        code_str = inspect.getsource(self.item.function)
+        src_lines = code_str.split('\n')[2:]
+        test_code = "\n".join(src_lines)
+
+        with open(f"{self.dir.name}/test.py", "w+") as test_script:
+            test_script.write("import sys\n")
+            test_script.write("import logging\n")
+            test_script.write("import traceback\n")
+            for path in self.plugin.sys_path_targets:
+                test_script.write(f"sys.path.append(\"{path}\")\n")
+
+            # To disable resource limit error message in mininet
+            test_script.write("from mininet.log import setLogLevel\n")
+            test_script.write("setLogLevel(\"critical\")\n")
+
+            test_script.write("try:\n")
+            test_script.write(test_code)
+            test_script.write("except Exception as e:\n")
+            test_script.write("    sys.stderr.write(traceback.format_exc())\n")
+
+        self.fspath = f"{self.dir.name}/test.py"
+        self.mount = Mount(
+            f"/root/tests/{self.dir.name[5:]}",
+            self.dir.name,
+            "bind"
+            )
+        self.plugin.dynmounts.append(self.mount)
+
+    def runtest(self):
+        ec, stdouts = self.plugin.container.exec_run(
+            ["python3", "test.py"],
+            workdir=f"/root/tests/{self.dir.name[5:]}/",
+            demux=True
+        )
+
+        stdout, stderr = stdouts
+
+        if stdout is not None:
+            tot_stdout = stdout.decode("utf-8")
+
+            print(tot_stdout)
+
+        if stderr is not None:
+            tot_stderr = stderr.decode("utf-8")
+            raise AssertionError(tot_stderr)
+
+    def cleanup(self):
+        self.dir.cleanup()
+
+
 class VirtualNetworkPlugin:
 
     def __init__(self, items):
+        self.dynmounts: List[Mount] = []
+        self.sys_path_targets: List[str] = []
         self.container: Optional[Container] = None
         self.vm_items: List[Item] = [
-            item for item in items if item.get_closest_marker("run_in_netvm")
+            VNetItem(self, item) for item in items if item.get_closest_marker("run_in_netvm")
         ]
 
         self.vm_required: bool = len(self.vm_items) > 0
@@ -40,9 +103,6 @@ class VirtualNetworkPlugin:
         self.docker_client = docker.from_env()
 
         # Read current sys.path, and create future bind mounts to container /root/lib
-        self.dynmounts: List[Mount] = []
-        self.sys_path_targets: List[str] = []
-
         for source_path in sys.path:
 
             # Replace all whats in front of "lib/python" in paths with /root
@@ -63,20 +123,26 @@ class VirtualNetworkPlugin:
                         )
                     )
 
-    def exec_in_vm(self, *args, **kwargs) -> int:
+        for item in self.vm_items:
+            item.prepare_run()
+
+    def exec_in_vm(self, *args, display=True, **kwargs) -> Tuple[int, str]:
         """Run and if a non zero exit code is returned raise exception
         """
-        print(" ".join(args[0]), end=" ... ", flush=True)
-        ec, _ = self.container.exec_run(
+        if display:
+            print(" ".join(args[0]), end=" ... ", flush=True)
+        ec, out = self.container.exec_run(
             *args, **kwargs
         )
         if ec != 0:
-            print("exception!")
-            raise NonZeroExitcode(
-                f"Command \"{args[0]}\" returned non zero exitcode {ec}."
-            )
-        print("done")
-        return ec
+            if display:
+                print(f"exception!\nec: {ec}\n{out}")
+            raise NonZeroExitcode(ec)
+        if display:
+            print("done")
+
+        return ec, out.decode("utf-8")
+
 
     def init_python(self, target_version: Optional[str] = None) -> None:
         if target_version is None:
@@ -118,6 +184,12 @@ class VirtualNetworkPlugin:
             self.exec_in_vm(
                 ["make", "install"],
                 workdir=f"/root/Python-{target_version}"
+            )
+
+            # Install mininet python package
+            self.exec_in_vm(
+                ["pip3", "install", "."],
+                workdir=f"/home/mininet"
             )
 
         except NonZeroExitcode as ex:
@@ -162,7 +234,6 @@ class VirtualNetworkPlugin:
             )
             self.init_python()
 
-        # Restart openvswitch just in case
         self.exec_in_vm(["service", "openvswitch-switch", "restart"])
 
     def shutdown(self):
@@ -170,3 +241,7 @@ class VirtualNetworkPlugin:
         self.container.stop()
         self.container.remove()
         print("done")
+
+        # Delete tmp dirs
+        for vmitem in self.vm_items:
+            vmitem.cleanup()

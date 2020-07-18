@@ -33,7 +33,12 @@ def pytest_runtest_call(item):
     def func_wrapper():
         ...
 
-    if item in VNET_PLUGIN.vm_items:
-        item.obj = func_wrapper
+    item_search = [
+        vmitem for vmitem in VNET_PLUGIN.vm_items if vmitem.item == item
+    ]
+
+    if len(item_search) > 0:
+        vmitem = item_search[0]
+        item.obj = vmitem.runtest
 
     yield
