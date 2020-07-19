@@ -11,7 +11,6 @@ RUN apt-get install \
 	-y \
 	--no-install-recommends \
 	git \
-	sudo \
 	patch \
 	net-tools \
 	apt-utils \
@@ -23,10 +22,20 @@ RUN apt-get install \
 RUN rm -rf /home/openflow/ && \
     mkdir /usr/share/man/man1
 
-# Install Mininet from git
+# Download Mininet source from git
 RUN git clone https://github.com/mininet/mininet.git /home/mininet/
 WORKDIR /home/mininet/
 RUN git checkout 2.3.0d6
+
+# Remove sudo, DEBIAN_FRONTEND and add --no-install-recommends &
+# suggests to all apt commands inside mininet/util/install.sh
+RUN sed -e 's/sudo //g' \
+		-e 's/DEBIAN_FRONTEND=noninteractive //g' \
+    	-e 's/~\//\//g' \
+    	-e 's/\(apt-get -y install\)/\1 --no-install-recommends --no-install-suggests/g' \
+    	-i /home/mininet/util/install.sh
+
+# Compile & Install Mininet
 RUN /home/mininet/util/install.sh -fnv
 
 # Python build requirements
@@ -50,8 +59,3 @@ RUN rm /usr/bin/lsb_release
 
 # Prepare Start
 EXPOSE 6633 6653 6640
-
-# Sleep forever
-COPY sleep.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/sleep.sh
-ENTRYPOINT ["sleep.sh"]
