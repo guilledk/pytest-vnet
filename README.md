@@ -13,7 +13,7 @@ from pytest_vnet import run_in_netvm
 
 @run_in_netvm
 def test_net():
-	from mininet.cli import CLI
+	from mininet.net import Mininet
 	...
 ```
 
