@@ -210,7 +210,7 @@ class VirtualNetworkPlugin:
             print()
 
         except docker.errors.ImageNotFound:
-            print("\nbase netvm image not found, pulling 238.3mb", end=" ... ", flush=True)
+            print("\nbase netvm image not found, pulling 242mb", end=" ... ", flush=True)
             self.docker_client.images.pull("guilledk/pytest-vnet", "netvm")
             print("done")
 
@@ -234,7 +234,8 @@ class VirtualNetworkPlugin:
             )
             self.init_python()
 
-        self.exec_in_vm(["service", "openvswitch-switch", "restart"])
+        self.exec_in_vm(["service", "openvswitch-switch", "start"])
+        self.exec_in_vm(["ovs-vsctl", "set-manager", "ptcp:6640"])
 
     def shutdown(self):
         print("\n\nstopping netvm", end=" ... ", flush=True)
