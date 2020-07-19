@@ -1,4 +1,4 @@
-FROM debian:buster-slim
+FROM debian:stretch-slim
 
 # Guarantee no prompts in dpkg
 ENV DEBIAN_FRONTEND=noninteractive
@@ -16,7 +16,8 @@ RUN apt-get install \
 	net-tools \
 	apt-utils \
 	iputils-ping \
-	ca-certificates
+	ca-certificates \
+	python-setuptools
 
 # Prepare Mininet Install
 RUN rm -rf /home/openflow/ && \
@@ -50,7 +51,7 @@ RUN rm /usr/bin/lsb_release
 # Prepare Start
 EXPOSE 6633 6653 6640
 
-COPY entrypoint.sh /home/entrypoint.sh
-RUN chmod +x /home/entrypoint.sh
-
-ENTRYPOINT [ "/home/entrypoint.sh" ]
+# Sleep forever
+COPY sleep.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/sleep.sh
+ENTRYPOINT ["sleep.sh"]

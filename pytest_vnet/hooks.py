@@ -1,64 +1,44 @@
 #!/usr/bin/env python3
 
-import docker
-import pytest_vnet
+import pytest
 
 from typing import Optional
 
-from pytest import Item
-from _pytest.runner import CallInfo
-
-from pytest_vnet import DOCKERC
-
-from docker.models.containers import Container
+from pytest_vnet.plugin import VirtualNetworkPlugin
 
 
-TEST_VM: Optional[Container] = None
+VNET_PLUGIN: Optional[VirtualNetworkPlugin] = None
 
-def pytest_sessionstart(session):
 
-	global TEST_VM
+def pytest_collection_modifyitems(session, config, items):
+    global VNET_PLUGIN
 
-	# Check if base image is present or pull it
-	try:
-		netvm_base_image = DOCKERC.images.get("guilledk/pytest-vnet:netvm")
+    VNET_PLUGIN = VirtualNetworkPlugin(items)
 
-	except docker.errors.ImageNotFound:
-		print("base netvm image not found, pulling 238.3mb", end=" ... ", flush=True)
-		DOCKERC.images.pull("guilledk/pytest-vnet", "netvm")
-		print("done")
+    if VNET_PLUGIN.vm_required:
+        VNET_PLUGIN.init_container()
 
-	print("starting netvm", end=" ... ", flush=True)
-	# Check if python enabled version is present or create it
-	try:
-		TEST_VM = pytest_vnet.initiate_container()
-
-	except docker.errors.ImageNotFound:
-		print(
-			f"installing python {pytest_vnet.PYTHON_VERSION}",
-			end=" ... ", flush=True
-		)
-		pytest_vnet.install_python_container()
-		TEST_VM = pytest_vnet.initiate_container()
-
-	finally:
-		print(f"done")
 
 def pytest_sessionfinish(session, exitstatus):
-	global TEST_VM
-	if TEST_VM is not None:
-		print("\nstopping netvm", end=" ... ", flush=True)
-		TEST_VM.stop()
-		TEST_VM.remove()
-		print("done")
+    global VNET_PLUGIN
+
+    if VNET_PLUGIN.vm_required:
+        VNET_PLUGIN.shutdown()
 
 
-def pytest_runtest_protocol(item: Item, nextitem: Optional[Item]) -> bool:
-	if "RUN_IN_NETVM" in [mark.name for mark in item.iter_markers()]:
-		ihook = item.ihook
-		ihook.pytest_runtest_logstart(nodeid=item.nodeid, location=item.location)
-		call = CallInfo(None, 0, 0, 0, "call")
-		report = ihook.pytest_runtest_makereport(item=item, call=call)
-		ihook.pytest_runtest_logreport(report=report)
-		ihook.pytest_runtest_logfinish(nodeid=item.nodeid, location=item.location)
-		return True
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call(item):
+    global VNET_PLUGIN
+
+    def func_wrapper():
+        ...
+
+    item_search = [
+        vmitem for vmitem in VNET_PLUGIN.vm_items if vmitem.item == item
+    ]
+
+    if len(item_search) > 0:
+        vmitem = item_search[0]
+        item.obj = vmitem.runtest
+
+    yield

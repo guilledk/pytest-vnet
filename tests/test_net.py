@@ -1,33 +1,31 @@
-
 from pytest_vnet import run_in_netvm
 
 @run_in_netvm
-def test_ifconfig():
-
-    from mininet.cli import CLI
-    from mininet.log import lg, info
+def test_imports():
     from mininet.net import Mininet
-    from mininet.node import OVSKernelSwitch
-    from mininet.topolib import TreeTopo
 
-    def ifconfigTest( net ):
-        "Run ifconfig on all hosts in net."
-        hosts = net.hosts
-        for host in hosts:
-            info( host.cmd( 'ifconfig' ) )
+    assert True
 
-    lg.setLogLevel( 'info' )
-    info( "*** Initializing Mininet and kernel modules\n" )
-    OVSKernelSwitch.setup()
-    info( "*** Creating network\n" )
-    network = Mininet( TreeTopo( depth=2, fanout=2 ), switch=OVSKernelSwitch )
-    info( "*** Starting network\n" )
-    network.start()
-    info( "*** Running ping test\n" )
-    network.pingAll()
-    info( "*** Running ifconfig test\n" )
-    ifconfigTest( network )
-    info( "*** Starting CLI (type 'exit' to exit)\n" )
-    CLI( network )
-    info( "*** Stopping network\n" )
-    network.stop()
+@run_in_netvm
+def test_emptynet():
+    from mininet.net import Mininet
+    from mininet.node import Controller
+
+    net = Mininet(controller=Controller)
+
+    net.addController("c0")
+
+    h1 = net.addHost("h1", ip="10.0.0.1")
+    h2 = net.addHost("h2", ip="10.0.0.2")
+
+    s3 = net.addSwitch("s3")
+
+    net.addLink(h1, s3)
+    net.addLink(h2, s3)
+
+    net.start()
+
+    assert "10.0.0.1" in h1.cmd("ip addr")
+    assert "10.0.0.2" in h2.cmd("ip addr")
+
+    net.stop()
