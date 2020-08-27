@@ -7,6 +7,6 @@ setup(
 	author='Guillermo Rodriguez',
 	author_email='guillermor@fing.edu.uy',
 	packages=['pytest_vnet'],
-	entry_points={"pytest11": ["pytest-vnet = pytest_vnet.hooks"]},
+	entry_points={"pytest11": ["pytest-vnet = pytest_vnet.plugin"]},
 	classifiers=["Framework :: Pytest"]
 )
