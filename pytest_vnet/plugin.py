@@ -56,9 +56,8 @@ class VNetItem:
             test_script.write("from mininet.log import setLogLevel\n")
             test_script.write("setLogLevel(\"critical\")\n")
 
-            if self.plugin.vm_scripts_path is not None:
-                # To have vm_script paths available
-                test_script.write(f"vm_scripts = {self.plugin._vm_scripts}\n")
+            # Additial tools inside vm scripts
+            test_script.write("from pytest_vnet import as_script\n")
 
             test_script.write("try:\n")
             test_script.write(test_code)
@@ -97,10 +96,7 @@ class VNetItem:
 
 class VirtualNetworkPlugin:
 
-    SCRIPTS_PATH = "/root/vm_scripts"
-
-    def __init__(self, items, vm_scripts_path: Optional[str] = None):
-        self.vm_scripts_path = vm_scripts_path
+    def __init__(self, items):
         self.dynmounts: List[Mount] = []
         self.sys_path_targets: List[str] = []
         self.container: Optional[Container] = None
@@ -132,18 +128,6 @@ class VirtualNetworkPlugin:
                         read_only=True
                     )
                 )
-
-        if vm_scripts_path is not None:
-            self.patch_vm_scripts()
-
-            self.dynmounts.append(
-                Mount(
-                    VirtualNetworkPlugin.SCRIPTS_PATH,
-                    self.vm_scripts_path,
-                    "bind",
-                    read_only=True
-                )
-            )
 
         for item in self.vm_items:
             item.prepare_run()
@@ -274,55 +258,14 @@ class VirtualNetworkPlugin:
         for vmitem in self.vm_items:
             vmitem.cleanup()
 
-        # Cleanup patched vm scripts
-        if self.vm_scripts_path is not None:
-            shutil.rmtree(f"{self.vm_scripts_path}/.tmp")
-
-
-    def patch_vm_scripts(self):
-        self._vm_scripts = {}
-        (pathlib.Path(self.vm_scripts_path) / ".tmp").mkdir(exist_ok=True)
-        for path in pathlib.Path(self.vm_scripts_path).glob('*.py'):
-            with open(path, 'r') as source_file:
-                with open(
-                    f"{self.vm_scripts_path}/.tmp/_patched_{path.name}", 'w+'
-                ) as patched_file:
-                    patched_file.write("# sys path patch begin\n")
-                    patched_file.write("import sys\n")
-                    for spath in self.sys_path_targets:
-                        patched_file.write(f"sys.path.append(\"{spath}\")\n")
-                    patched_file.write("# sys path patch end\n")
-                    patched_file.write(source_file.read())
-
-            self._vm_scripts[path.stem] = f"{self.SCRIPTS_PATH}/.tmp/_patched_{path.name}"
 
 VNET_PLUGIN: Optional[VirtualNetworkPlugin] = None
-
-VNET_SCRIPTS_CONF = 'vm_scripts'
-
-def pytest_addoption(parser):
-    parser.addini(
-        VNET_SCRIPTS_CONF,
-        "scripts in this folder will be available inside the net vm"
-    )
 
 
 def pytest_collection_modifyitems(session, config, items):
     global VNET_PLUGIN
 
-    _mounts = []
-
-    try:
-        vm_scripts_path_str = config.getini(VNET_SCRIPTS_CONF)
-        vm_scripts_path_abs = str(pathlib.Path(vm_scripts_path_str).absolute())
-
-    except ValueError:
-        pass
-
-    VNET_PLUGIN = VirtualNetworkPlugin(
-        items,
-        vm_scripts_path=vm_scripts_path_abs
-    )
+    VNET_PLUGIN = VirtualNetworkPlugin(items)
 
     if VNET_PLUGIN.vm_required:
         VNET_PLUGIN.init_container()
@@ -348,3 +291,36 @@ def pytest_runtest_call(item):
         item.obj = vmitem.runtest
 
     yield
+
+
+def as_script(func):
+
+    import inspect
+
+    with open(
+        f"/root/scripts/{func.__name__}.py", 'w+'
+    ) as source_file:
+        code_str = inspect.getsource(func)
+        src_lines = code_str.split('\n')[2:]
+
+        if src_lines[0][0] == '\t':
+            func_code = "\n".join([line[1:] for line in src_lines])
+        elif src_lines[0][0] == ' ':
+            for i, ch in enumerate(src_lines[0]):
+                if ch != ' ':
+                    func_code = "\n".join([line[i:] for line in src_lines])
+                    break
+        else:
+            raise IndentationError(f"In function {func.__name__}")
+
+        source_file.write("import sys\n")
+        for path in sys.path:
+            source_file.write(f"sys.path.append(\"{path}\")\n")
+        source_file.write(func_code)
+
+    def direct_call(*args, **kwargs):
+        direct_call(*args, **kwargs)
+
+    direct_call.path = f"/root/scripts/{func.__name__}.py"
+
+    return direct_call

@@ -57,5 +57,8 @@ RUN apt-get install \
 # This is to fix an issue when building python
 RUN rm /usr/bin/lsb_release
 
+# Prepare scripts directory for as_script decorator
+RUN mkdir /root/scripts
+
 # Prepare Start
 EXPOSE 6633 6653 6640
