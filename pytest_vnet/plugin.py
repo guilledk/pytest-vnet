@@ -14,8 +14,8 @@ from typing import Optional, Tuple, Union, List
 from tempfile import TemporaryDirectory
 
 from docker.types import Mount
+from docker.errors import DockerException
 from docker.models.containers import Container
-
 
 PYTHON_VERSION = f"{sys.version_info[0]}."\
     f"{sys.version_info[1]}."\
@@ -53,16 +53,22 @@ class VNetItem:
                 test_script.write(f"sys.path.append(\"{path}\")\n")
 
             # To disable resource limit error message in mininet
+            test_script.write("from mininet.net import Mininet\n")
+            test_script.write("from mininet.node import Controller\n")
             test_script.write("from mininet.log import setLogLevel\n")
             test_script.write("setLogLevel(\"critical\")\n")
 
             # Additial tools inside vm scripts
-            test_script.write("from pytest_vnet import as_script\n")
+            test_script.write("from pytest_vnet import as_script, as_host\n")
 
+
+            test_script.write("vnet = Mininet(controller=Controller)\n")
             test_script.write("try:\n")
+            test_script.write("    vnet.addController('c0')\n")
             test_script.write(test_code)
             test_script.write("except Exception as e:\n")
             test_script.write("    sys.stderr.write(traceback.format_exc())\n")
+            test_script.write("\nvnet.stop()\n")
 
         self.fspath = f"{self.dir.name}/test.py"
         self.mount = Mount(
@@ -109,7 +115,11 @@ class VirtualNetworkPlugin:
         if not self.vm_required:
             return
 
-        self.docker_client = docker.from_env()
+        try:
+            self.docker_client = docker.from_env()
+
+        except DockerException as e:
+            raise DockerInitError(f"Is docker running?: \n{e}")
 
         # Read current sys.path, and create future bind mounts to container /root/lib
         for source_path in sys.path:
@@ -220,9 +230,6 @@ class VirtualNetworkPlugin:
             self.docker_client.images.pull("guilledk/pytest-vnet", "netvm")
             print("done")
 
-        except BaseException as e:
-            raise DockerInitError(f"Is docker running?: \n{e}")
-
         print("starting netvm", end=" ... ", flush=True)
         # Check if python enabled version is present or create it           
         try:
@@ -274,7 +281,7 @@ def pytest_collection_modifyitems(session, config, items):
 def pytest_sessionfinish(session, exitstatus):
     global VNET_PLUGIN
 
-    if VNET_PLUGIN.vm_required:
+    if VNET_PLUGIN and VNET_PLUGIN.vm_required:
         VNET_PLUGIN.shutdown()
 
 
@@ -324,3 +331,17 @@ def as_script(func):
     direct_call.path = f"/root/scripts/{func.__name__}.py"
 
     return direct_call
+
+
+def as_host(vnet, hostname, addr, link):
+
+    def wrapper(func):
+        func = as_script(func)
+        func.host = vnet.addHost(hostname, ip=addr)
+        vnet.addLink(func.host, link)
+        def _start_proc():
+            func.proc = func.host.popen(["python3", func.path])
+        func.start_host = _start_proc
+        return func
+
+    return wrapper

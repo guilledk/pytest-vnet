@@ -1,18 +1,35 @@
-# `pytest-vnet`
-
-`pytest-vnet` is a `pytest` plugin for running software defined network tests inside a docker container with `mininet`, the plugin will manage the python envoirment inside the container to match the hosts python version or a custom one, load tests into the container, run them and return results.
-
-## Install this package:
-
-	pip install git+git://github.com/guilledk/pytest-vnet.git
-
-## Mark your mininet tests with:
-
-- `@run_in_netvm`: Will run the test inside the container.
-- `@as_script`: Will make the function available as a script inside the container (should only be used inside a `@run_in_netvm` decorated function).
-
-```python
 from pytest_vnet import run_in_netvm
+
+@run_in_netvm
+def test_echo_script():
+
+    @as_script
+    def echo():
+        import sys
+        print(sys.argv[1])
+
+    import subprocess
+
+    message = "Hello World!"
+
+    assert subprocess.check_output(
+        ['python3', echo.path, message]
+    ).decode('utf-8').rstrip() == message
+
+
+@run_in_netvm
+def test_inner_import():
+
+    import subprocess
+
+    @as_script
+    def inner():
+        import pytest_vnet
+        print("OK")
+
+    assert subprocess.check_output(
+        ['python3', inner.path]
+    ).decode('utf-8').rstrip() == "OK"
 
 @run_in_netvm
 def test_vsocket_hello():
@@ -41,8 +58,3 @@ def test_vsocket_hello():
     receiver.start_host()
     sender.start_host()
     receiver.proc.wait(timeout=3)
-```
-
-## Run your test:
-
-	pytest
