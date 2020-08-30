@@ -269,7 +269,26 @@ class VirtualNetworkPlugin:
 VNET_PLUGIN: Optional[VirtualNetworkPlugin] = None
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--disable-vnet",
+        action="store_true",
+        default=False,
+        help="Disable virtual network tests.",
+    )
+
+
+def pytest_runtest_setup(item):
+    if item.get_closest_marker("run_in_netvm"):
+        if item.config.getoption("--disable-vnet"):
+            pytest.skip("vnet tests were disabled")
+
+
 def pytest_collection_modifyitems(session, config, items):
+
+    if config.getoption("--disable-vnet"):
+        return
+
     global VNET_PLUGIN
 
     VNET_PLUGIN = VirtualNetworkPlugin(items)
@@ -289,13 +308,14 @@ def pytest_sessionfinish(session, exitstatus):
 def pytest_runtest_call(item):
     global VNET_PLUGIN
 
-    item_search = [
-        vmitem for vmitem in VNET_PLUGIN.vm_items if vmitem.item == item
-    ]
+    if VNET_PLUGIN is not None:
+        item_search = [
+            vmitem for vmitem in VNET_PLUGIN.vm_items if vmitem.item == item
+        ]
 
-    if len(item_search) > 0:
-        vmitem = item_search[0]
-        item.obj = vmitem.runtest
+        if len(item_search) > 0:
+            vmitem = item_search[0]
+            item.obj = vmitem.runtest
 
     yield
 
