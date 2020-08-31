@@ -46,29 +46,31 @@ class VNetItem:
         test_code = "\n".join(src_lines)
 
         with open(f"{self.dir.name}/test.py", "w+") as test_script:
-            test_script.write("import sys\n")
-            test_script.write("import logging\n")
-            test_script.write("import traceback\n")
-            for path in self.plugin.sys_path_targets:
-                test_script.write(f"sys.path.append(\"{path}\")\n")
+            test_script.writelines([
+                "import sys\n",
+                "import logging\n",
+                "import traceback\n",
+                *[f"sys.path.append(\'{path}\')\n" for path in self.plugin.sys_path_targets],
+                "from mininet.net import Mininet\n",
+                "from mininet.node import Controller\n\n",
 
-            # To disable resource limit error message in mininet
-            test_script.write("from mininet.net import Mininet\n")
-            test_script.write("from mininet.node import Controller\n")
-            test_script.write("from mininet.log import setLogLevel\n")
-            test_script.write("setLogLevel(\"critical\")\n")
+                "from mininet.log import setLogLevel\n",
+                "setLogLevel('critical')\n\n",
+                
+                "# Additional tools inside vm scripts\n",
+                "from pytest_vnet import as_script, as_host\n\n",
 
-            # Additial tools inside vm scripts
-            test_script.write("from pytest_vnet import as_script, as_host\n")
+                "vnet = Mininet(controller=Controller)\n",
+                "try:\n",
+                "    vnet.addController('c0')\n",
+                test_code,
+                "\n",
+                "except Exception as e:\n",
+                "    sys.stderr.write(traceback.format_exc())\n\n",
 
-
-            test_script.write("vnet = Mininet(controller=Controller)\n")
-            test_script.write("try:\n")
-            test_script.write("    vnet.addController('c0')\n")
-            test_script.write(test_code)
-            test_script.write("except Exception as e:\n")
-            test_script.write("    sys.stderr.write(traceback.format_exc())\n")
-            test_script.write("\nvnet.stop()\n")
+                "finally:\n",
+                "    vnet.stop()\n"
+            ])
 
         self.fspath = f"{self.dir.name}/test.py"
         self.mount = Mount(
@@ -322,45 +324,50 @@ def pytest_runtest_call(item):
 
 def as_script(func):
 
+    import random
     import inspect
 
-    with open(
-        f"/root/scripts/{func.__name__}.py", 'w+'
-    ) as source_file:
-        code_str = inspect.getsource(func)
-        src_lines = code_str.split('\n')[2:]
+    random_id = ''.join([
+        random.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(16)
+    ])
+    source_path = f"/root/scripts/{func.__name__}-{random_id}.py"
 
-        if src_lines[0][0] == '\t':
-            func_code = "\n".join([line[1:] for line in src_lines])
-        elif src_lines[0][0] == ' ':
-            for i, ch in enumerate(src_lines[0]):
-                if ch != ' ':
-                    func_code = "\n".join([line[i:] for line in src_lines])
-                    break
-        else:
-            raise IndentationError(f"In function {func.__name__}")
+    code_str = inspect.getsource(func)
+    src_lines = code_str.split('\n')[2:]
 
-        source_file.write("import sys\n")
-        for path in sys.path:
-            source_file.write(f"sys.path.append(\"{path}\")\n")
-        source_file.write(func_code)
+    if src_lines[0][0] == '\t':
+        func_code = "\n".join([line[1:] for line in src_lines])
+    elif src_lines[0][0] == ' ':
+        for i, ch in enumerate(src_lines[0]):
+            if ch != ' ':
+                func_code = "\n".join([line[i:] for line in src_lines])
+                break
+    else:
+        raise IndentationError(f"In function {func.__name__}")
+
+    with open(source_path, "w+") as source_file:
+        source_file.writelines([
+            f"import sys\n",
+            *[f"sys.path.append(\'{path}\')\n" for path in sys.path],
+            func_code
+        ])
 
     def direct_call(*args, **kwargs):
         direct_call(*args, **kwargs)
 
-    direct_call.path = f"/root/scripts/{func.__name__}.py"
+    direct_call.path = source_path
 
     return direct_call
 
 
-def as_host(vnet, hostname, addr, link):
+def as_host(vnet, hostname, link, *args, **kwargs):
 
     def wrapper(func):
         func = as_script(func)
-        func.host = vnet.addHost(hostname, ip=addr)
+        func.host = vnet.addHost(hostname, *args, **kwargs)
         vnet.addLink(func.host, link)
         def _start_proc():
-            func.proc = func.host.popen(["python3", func.path])
+            func.proc = func.host.popen([sys.executable, func.path])
         func.start_host = _start_proc
         return func
 
