@@ -9,7 +9,11 @@
 ## Mark your mininet tests with:
 
 - `@run_in_netvm`: Will run the test inside the container.
-- `@as_script`: Will make the function available as a script inside the container (should only be used inside a `@run_in_netvm` decorated function).
+
+Available inside marked tests:
+
+- `@as_script`: Will make the function available as a script inside the container.
+- `@as_host`: Will create a mininet host and will provide ``start_host`` to launch the function code as a process inside that host.
 
 ```python
 from pytest_vnet import run_in_netvm
@@ -19,7 +23,7 @@ def test_vsocket_hello():
 
     s3 = vnet.addSwitch("s3")
 
-    @as_host(vnet, 'h1', '10.0.0.1', s3)
+    @as_host(vnet, 'h1', s3, ip='10.0.0.1')
     def receiver():
         import socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -30,7 +34,7 @@ def test_vsocket_hello():
                 data = conn.recv(1024)
                 assert data == b"Hello world through a virtual socket!"
 
-    @as_host(vnet, 'h2', '10.0.0.2', s3)
+    @as_host(vnet, 'h2', s3)
     def sender():
         import socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
