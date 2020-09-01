@@ -30,8 +30,8 @@ RUN git checkout 2.3.0d6
 # Remove sudo, DEBIAN_FRONTEND and add --no-install-recommends &
 # suggests to all apt commands inside mininet/util/install.sh
 RUN sed -e 's/sudo //g' \
-		-e 's/DEBIAN_FRONTEND=noninteractive //g' \
     	-e 's/~\//\//g' \
+		-e 's/DEBIAN_FRONTEND=noninteractive //g' \
     	-e 's/\(apt-get -y install\)/\1 --no-install-recommends --no-install-suggests/g' \
     	-i /home/mininet/util/install.sh
 
@@ -59,6 +59,9 @@ RUN rm /usr/bin/lsb_release
 
 # Prepare scripts directory for as_script decorator
 RUN mkdir /root/scripts
+
+# Mininet expects this file to exist, even if its empty
+RUN touch /etc/network/interfaces
 
 # Prepare Start
 EXPOSE 6633 6653 6640
