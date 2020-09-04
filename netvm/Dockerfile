@@ -63,5 +63,8 @@ RUN mkdir /root/scripts
 # Mininet expects this file to exist, even if its empty
 RUN touch /etc/network/interfaces
 
+# To be able to tell if inside a vm
+ENV INSIDE_NETVM=true
+
 # Prepare Start
 EXPOSE 6633 6653 6640
