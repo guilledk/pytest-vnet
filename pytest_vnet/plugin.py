@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import platform
 import subprocess
 
 from typing import Optional
@@ -7,9 +8,6 @@ from tempfile import NamedTemporaryFile
 
 import pytest
 import docker
-
-from mininet.net import Mininet
-from mininet.node import Controller
 
 from .vm import VirtualNetworkPlugin
 
@@ -178,6 +176,8 @@ def as_host(vnet, hostname, link, *args, **kwargs):
 
 @pytest.fixture
 def vnet():
+    from mininet.net import Mininet
+    from mininet.node import Controller
     vnet = Mininet(controller=Controller)
     vnet.addController('c0')
     yield vnet

@@ -8,5 +8,9 @@ setup(
 	author_email='guillermor@fing.edu.uy',
 	packages=['pytest_vnet'],
 	entry_points={"pytest11": ["pytest-vnet = pytest_vnet.plugin"]},
-	classifiers=["Framework :: Pytest"]
+	classifiers=["Framework :: Pytest"],
+	install_requires=[
+		'pytest',
+		'docker'
+	]
 )

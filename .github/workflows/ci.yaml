@@ -22,7 +22,9 @@ jobs:
       - name: Install Mininet
         run: sudo bash $GITHUB_WORKSPACE/mininet/util/install.sh -nfv
       - name: Setup python
-        run: sudo apt install python${{ matrix.python }} python3-setuptools
+        run: sudo apt-get install python${{ matrix.python }} python3-setuptools
+      - name: Update pip
+        run: sudo pip3 install -U pip
       - name: Install dependencies
         run: sudo pip3 install -U . -r requirements.txt --upgrade-strategy eager
       - name: Start Mininet backend
