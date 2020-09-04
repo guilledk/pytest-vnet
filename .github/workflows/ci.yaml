@@ -1,0 +1,31 @@
+name: CI
+
+on: push
+
+jobs:
+  testing-native:
+    name: 'Native - Python ${{ matrix.python }}'
+    timeout-minutes: 3
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.7', '3.8']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Checkout Mininet
+        uses: actions/checkout@v2
+        with:
+          repository: 'mininet/mininet'
+          path: mininet
+      - name: Install Mininet
+        run: sudo bash $GITHUB_WORKSPACE/mininet/util/install.sh -nfv
+      - name: Setup python
+        run: sudo apt install python${{ matrix.python }} python3-setuptools
+      - name: Install dependencies
+        run: sudo pip3 install -U . -r requirements.txt --upgrade-strategy eager
+      - name: Start Mininet backend
+        run: sudo service openvswitch-switch start && sudo ovs-vsctl set-manager ptcp:6640
+      - name: Run tests
+        run: sudo pytest tests/

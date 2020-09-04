@@ -16,6 +16,7 @@ from .vm import VirtualNetworkPlugin
 
 VNET_PLUGIN: Optional[VirtualNetworkPlugin] = None
 
+multihost_test = pytest.mark.multihost
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -82,7 +83,13 @@ def as_script(func):
 
     # create source code
     code_str = inspect.getsource(func)
-    src_lines = code_str.split('\n')[2:]
+    src_lines = code_str.split('\n')
+
+    # remove function signature
+    i = 0
+    while f"def {func.__name__}(" not in src_lines[i]:
+        i += 1
+    src_lines = src_lines[i+1:]
 
     if src_lines[0][0] == '\t':
         for i, ch in enumerate(src_lines[0]):
@@ -98,19 +105,22 @@ def as_script(func):
     else:
         raise IndentationError(f"In function {func.__name__}")
 
-    # add one indentation level (only spaces suported atm)
-    # and newline to all lines
-    src_lines = [f"    {line}\n" for line in src_lines]    
-
-    # add exception relay machinery
-    src_lines.insert(0, "try:\n")
-    src_lines.append(
-        "\nexcept Exception as e:\n"
-        "    sys.stderr.write(traceback.format_exc())\n"
-    )
+    src_lines = [line + '\n' for line in src_lines]
 
     # write file
     if os.environ.get("INSIDE_NETVM", False):
+
+        # add one indentation level (only spaces suported atm)
+        # and newline to all lines
+        src_lines = [f"    {line}" for line in src_lines]    
+
+        # add exception relay machinery
+        src_lines.insert(0, "try:\n")
+        src_lines.append(
+            "\nexcept Exception as e:\n"
+            "    sys.stderr.write(traceback.format_exc())\n"
+        )
+
         random_id = ''.join([
             random.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(16)
         ])
@@ -147,13 +157,20 @@ def as_host(vnet, hostname, link, *args, **kwargs):
         func = as_script(func)
         func.host = vnet.addHost(hostname, *args, **kwargs)
         vnet.addLink(func.host, link)
+
         def _start_proc():
             func.proc = func.host.popen(
                 [sys.executable, func.path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
+
+        def _ip_addr():
+            return func.host.cmd('ip addr')
+
         func.start_host = _start_proc
+        func.ipaddr = _ip_addr
+
         return func
 
     return wrapper

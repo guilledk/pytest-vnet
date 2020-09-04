@@ -49,4 +49,8 @@ def test_vsocket_hello(vnet):
 
 ## Run your test:
 
-	pytest
+	sudo pytest
+
+## Run tests in container:
+
+    pytest --enable-netv
