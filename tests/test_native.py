@@ -3,21 +3,6 @@ import subprocess
 
 from pytest_vnet import vnet, as_host, as_script
 
-def test_emptynet(vnet):
-    s3 = vnet.addSwitch("s3")
-
-    h1 = vnet.addHost("h1", ip="10.0.0.1")
-    h2 = vnet.addHost("h2", ip="10.0.0.2")
-
-    vnet.addLink(h1, s3)
-    vnet.addLink(h2, s3)
-
-    vnet.start()
-
-    assert "10.0.0.1" in h1.cmd("ip addr")
-    assert "10.0.0.2" in h2.cmd("ip addr")
-
-
 def test_echo_script():
 
     @as_script
@@ -32,16 +17,19 @@ def test_echo_script():
     ).decode('utf-8').rstrip() == message
 
 
-def test_inner_import():
+def test_emptynet(vnet):
+    s3 = vnet.addSwitch("s3")
 
-    @as_script
-    def inner():
-        import pytest_vnet
-        print("OK")
+    h1 = vnet.addHost("h1", ip="10.0.0.1")
+    h2 = vnet.addHost("h2", ip="10.0.0.2")
 
-    assert subprocess.check_output(
-        [sys.executable, inner.path]
-    ).decode('utf-8').rstrip() == "OK"
+    vnet.addLink(h1, s3)
+    vnet.addLink(h2, s3)
+
+    vnet.start()
+
+    assert "10.0.0.1" in h1.cmd("ip addr")
+    assert "10.0.0.2" in h2.cmd("ip addr")
 
 
 def test_vsocket_hello(vnet):
@@ -58,12 +46,12 @@ def test_vsocket_hello(vnet):
             with conn:
                 data = conn.recv(1024)
                 assert data == b"Hello world through a virtual socket!"
+                print('hello client!')
 
     @as_host(vnet, 'h2', s3, ip='10.0.0.2')
     def sender():
         import sys
         import socket
-        sys.stderr.write("test")
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(('10.0.0.1', 50090))
             s.sendall("Hello world through a virtual socket!".encode('utf-8'))
@@ -72,3 +60,5 @@ def test_vsocket_hello(vnet):
     receiver.start_host()
     sender.start_host()
     receiver.proc.wait(timeout=3)
+
+    assert b'hello' in receiver.proc.stdout.read()
