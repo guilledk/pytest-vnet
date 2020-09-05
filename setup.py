@@ -11,6 +11,6 @@ setup(
 	classifiers=["Framework :: Pytest"],
 	install_requires=[
 		'pytest',
-		'docker'
+		'mininet @ git+git://github.com/mininet/mininet.git'
 	]
 )

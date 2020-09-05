@@ -1,3 +1,0 @@
-pytest
-docker
-git+git://github.com/mininet/mininet.git
