@@ -29,11 +29,9 @@ def test_vsocket_hello(vnet):
             with conn:
                 data = conn.recv(1024)
                 assert data == b"Hello world through a virtual socket!"
-                print('hello client!')
 
     @as_host(vnet, 'h2', s3, ip='10.0.0.2')
     def sender():
-        import sys
         import socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect(('10.0.0.1', 50090))
@@ -42,9 +40,7 @@ def test_vsocket_hello(vnet):
     vnet.start()
     receiver.start_host()
     sender.start_host()
-    receiver.proc.wait(timeout=3)
-
-    assert b'hello' in receiver.proc.stdout.read()
+    receiver.wait(timeout=3)
 ```
 
 ## Run your test:
