@@ -51,6 +51,4 @@ def test_vsocket_hello(vnet):
 
 	sudo pytest
 
-## Run tests in container:
-
-    pytest --enable-netv
+_mininet requires sudo_
