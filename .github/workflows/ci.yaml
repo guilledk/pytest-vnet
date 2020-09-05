@@ -26,7 +26,7 @@ jobs:
       - name: Update pip
         run: sudo pip3 install -U pip
       - name: Install dependencies
-        run: sudo pip3 install -U . -r requirements.txt --upgrade-strategy eager
+        run: sudo pip3 install -U . --upgrade-strategy eager
       - name: Start Mininet backend
         run: sudo service openvswitch-switch start && sudo ovs-vsctl set-manager ptcp:6640
       - name: Run tests
