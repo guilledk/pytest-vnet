@@ -1,11 +1,8 @@
-from pytest_vnet import run_in_netvm
+#!/usr/bin/env python3
+from pytest_vnet import vnet
 
-@run_in_netvm
-def test_run_in_netvm():
-    assert True
 
-@run_in_netvm
-def test_emptynet():
+def test_emptynet(vnet):
     s3 = vnet.addSwitch("s3")
 
     h1 = vnet.addHost("h1", ip="10.0.0.1")
