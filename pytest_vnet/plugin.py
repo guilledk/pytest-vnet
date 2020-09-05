@@ -13,7 +13,8 @@ from mininet.net import Mininet
 from mininet.node import Controller
 
 
-multihost_test = pytest.mark.multihost
+class HostException(Exception):
+    ...
 
 
 def as_script(func):
@@ -27,21 +28,16 @@ def as_script(func):
         i += 1
     src_lines = src_lines[i+1:]
 
-    if src_lines[0][0] == '\t':
-        for i, ch in enumerate(src_lines[0]):
-            if ch != '\t':
-                src_lines = [line[i:] for line in src_lines]
-                break
-
-    elif src_lines[0][0] == ' ':
-        for i, ch in enumerate(src_lines[0]):
-            if ch != ' ':
-                src_lines = [line[i:] for line in src_lines]
-                break
-    else:
-        raise IndentationError(f"In function {func.__name__}")
-
     src_lines = [line + '\n' for line in src_lines]
+
+    # add exception relay machinery
+    src_lines.insert(0, "import sys\n")
+    src_lines.insert(1, "import traceback\n")
+    src_lines.insert(2, "try:\n")
+    src_lines.append(
+        "\nexcept Exception as e:\n"
+        "    sys.stderr.write(traceback.format_exc())\n"
+    )
 
     # write file
     source_file = NamedTemporaryFile(
@@ -52,6 +48,7 @@ def as_script(func):
     )
     source_file.writelines(src_lines)
     source_path = source_file.name
+    func.source = ''.join(src_lines)
 
     def direct_call(*args, **kwargs):
         direct_call(*args, **kwargs)
@@ -78,8 +75,16 @@ def as_host(vnet, hostname, link, *args, **kwargs):
         def _ip_addr():
             return func.host.cmd('ip addr')
 
+        def _wait(timeout=None):
+            func.proc.wait(timeout=timeout)
+
+            stderr = func.proc.stderr.read().decode('utf-8')
+            if len(stderr) > 0:
+                raise HostException(stderr)
+
         func.start_host = _start_proc
         func.ipaddr = _ip_addr
+        func.wait = _wait
 
         return func
 
